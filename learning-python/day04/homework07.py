@@ -10,20 +10,41 @@ Author: lsy
 Date: 2025/12/3
 """
 
-fish = 6
+fish=6
 while True:
-    is_enough = True
+    is_enough=True # 假设够分
 
-    # 判断是否够分
-    total = fish
-    for _ in range(5):  # 0到4 不关心下标，只关心循环了几次
-        if (total - 1) % 5 == 0:
-            total = 4 * (total - 1) // 5
-        else:
-            is_enough = False
+    total=fish
+
+    for _ in range(5):
+        if (total-1)%5!=0:
+            is_enough=False
             break
+        else:
+            total=4*(total-1)//5
 
     if is_enough:
-        print(fish)
+        print("Fish is",fish)
         break
-    fish += 5
+
+    fish+=5
+
+
+
+# fish = 6
+# while True:
+#     is_enough = True
+#
+#     # 判断是否够分
+#     total = fish
+#     for _ in range(5):  # 0到4 不关心下标，只关心循环了几次
+#         if (total - 1) % 5 == 0:
+#             total = 4 * (total - 1) // 5
+#         else:
+#             is_enough = False
+#             break
+#
+#     if is_enough:
+#         print(fish)
+#         break
+#     fish += 5
