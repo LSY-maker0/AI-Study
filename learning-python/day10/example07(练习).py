@@ -8,6 +8,19 @@ import random
 
 money=1000
 
+
+def win():
+    global money
+    money += xiazhu
+    print('玩家胜')
+
+
+def lose():
+    global money
+    money -= xiazhu
+    print('玩家输')
+
+
 while money>0:
   xiazhu=0
   print(f'当前余额:{money}')
@@ -20,21 +33,17 @@ while money>0:
 
   first_point=random.randrange(1,7)+random.randrange(1,7)
   if first_point in (7,11):
-    money+=xiazhu
-    print('玩家胜')
+    win()
   elif first_point in (1,3,5):
-    money-=xiazhu
-    print('玩家输')
+    lose()
   else:
     while True:
       curr_point=random.randrange(1,7)+random.randrange(1,7)
       if curr_point==first_point:
-        money+=xiazhu
-        print('玩家胜')
+        win()
         break
       elif curr_point==7:
-        money-=xiazhu
-        print('玩家输')
+        lose()
         break
 print('输光了啊啊')
   
