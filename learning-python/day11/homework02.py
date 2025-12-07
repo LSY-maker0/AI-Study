@@ -8,6 +8,7 @@ Author: lsy
 Date: 2025/12/6
 """
 import math
+import random
 
 def ptp(data):
     """极差"""
@@ -36,7 +37,12 @@ def median(data):
     else:
         return average(temp[size//2-1:size//2+1])
 
-nums=[1,2,3,9,8,6,4]
-print(ptp(nums))
-print(standard_deviation(nums))
-print(median(nums))
+
+
+# __name__是一个隐藏变量，它代表了当前模块（文件）的名字
+# print(__name__) # 如果直接运行homework02文件，输出 __main__，否则就是 homework02
+
+if __name__ == '__main__':
+    nums = [random.randrange(1,101) for _ in range(8)]
+    print(f'均值{average(nums)}')
+    print(f'方差{standard_deviation(nums)}')
