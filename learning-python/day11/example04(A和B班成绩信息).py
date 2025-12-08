@@ -25,3 +25,4 @@ print(f'中位数{homework02.median(class_b_scores)}')
 
 from utils.add import add as addNum
 print(addNum(1,2))
+
