@@ -12,6 +12,17 @@ Date: 2025/12/8
 """
 
 
+# 构造器创建的对象基本都在堆空间（有些字符串放常量池），而对象的引用通常是放在栈上的，通过对象引用（变量）
+# 就可以访问到对象并向其发出消息
+
+# 如果对象没有被引用，那么Python解释器的自动内存管理机制会对其空间进行回收
+
+# 魔术方法：有特殊用途的方法
+# __init__ 初始化方法，创建对象时候自动调用
+# __str__ 获得对象的字符串表示，调用print函数输出对象会被自动调用
+# __repr__ 获得对象的字符串表示，把对象放到容器中，print输出时自动调用
+#     representation
+
 class Triangle:
     def __init__(self, a, b, c):
         if not Triangle.is_valid(a, b, c):
@@ -20,12 +31,21 @@ class Triangle:
         self.b = b
         self.c = c
 
+    def __str__(self):
+        return self.show()
+
+    # def __repr__(self): # 放在容器中print自动调用
+    #     return self.show()
+
+    def show(self):
+        return f'边长分别为{self.a},{self.b},{self.c}'
+
     # @classmethod
     # def is_valid(cls,a,b,c):
     #     return a + b > c and a + c > b and b + c > a
 
     @staticmethod
-    def is_valid(a,b,c):
+    def is_valid(a, b, c):
         return a + b > c and a + c > b and b + c > a
 
     def perimeter(self):
@@ -35,11 +55,17 @@ class Triangle:
         half = self.perimeter() / 2
         return (half * (half - self.a) * (half - self.b) * (half - self.c)) ** 0.5
 
-
-if __name__ == '__main__':
+def main():
     try:
-        t = Triangle(1,2,1)
+        t = Triangle(3, 4, 5)
+        print(t)
         print(t.perimeter())
         print(t.area())
+
+        list=[t]
+        print(list)
     except ValueError as err:
         print(err)
+
+if __name__ == '__main__':
+    main()
