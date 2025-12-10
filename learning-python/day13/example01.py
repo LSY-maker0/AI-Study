@@ -26,11 +26,18 @@ Date: 2025/12/8
 
 class Student:
     """学生"""
+    # __slots__ = ("name", "age") # 只能有这两个属性
 
     # 数据抽象
     def __init__(self,name,age):
-        self.name = name
+        self.name = name # 变成私有属性，无法更改
         self.age = age
+
+    # def __str__(self):
+    #     return f'{self.name} {self.age}'
+    #
+    # def __repr__(self):
+    #     return f'{self.name} {self.age}'
 
     # 行为抽象(方法)
     def eat(self):
@@ -44,3 +51,9 @@ class Student:
     def play(self,game_name):
         """玩"""
         print(f'{self.name}正在玩{game_name}')
+
+def main():
+    stu=Student('张三',18)
+
+if __name__ == '__main__':
+    main()
