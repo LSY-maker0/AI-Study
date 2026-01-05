@@ -8,7 +8,7 @@ Date: 2026/1/5
 """
 from os import SEEK_END, SEEK_SET
 
-file = open(file='resources/apple.jpeg', mode='rb')
+file = open(file='../resources/apple.jpeg', mode='rb')
 file.seek(0,SEEK_END) # 从0移动到文件末尾
 print(file.tell())  # 移动的字节数 6185字节
 file.seek(0,SEEK_SET)

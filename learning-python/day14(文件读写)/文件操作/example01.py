@@ -15,7 +15,7 @@ Date: 2026/1/4
 import sys
 
 print(sys.getdefaultencoding())
-file = open('resources/静夜思.txt', 'r', encoding='utf-8')
+file = open('../resources/静夜思.txt', 'r', encoding='utf-8')
 try:
     # print(file.read(12),end="")  # 读文件 指定每次读12个字符
     data = file.read(12) # 如果读不到数据，read方法会返回None

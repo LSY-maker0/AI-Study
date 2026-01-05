@@ -8,7 +8,7 @@ from hashlib import md5,sha256
 
 hasher=md5()
 hasher2=sha256()
-file = open('resources/apple.jpeg','rb')
+file = open('../resources/apple.jpeg', 'rb')
 try:
     data = file.read(512)
     while data:

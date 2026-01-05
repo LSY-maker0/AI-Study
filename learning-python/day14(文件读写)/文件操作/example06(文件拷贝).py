@@ -17,4 +17,4 @@ def file_copy(source_file,target_file):
                 data = source.read(512)
 
 if __name__ == '__main__':
-    file_copy('resources/apple.jpeg','source/apple.jpeg')
+    file_copy('../resources/apple.jpeg', 'source/apple.jpeg')
