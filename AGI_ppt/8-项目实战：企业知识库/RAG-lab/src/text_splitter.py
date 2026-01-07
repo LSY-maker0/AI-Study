@@ -13,15 +13,15 @@ class TextSplitter:
     def __init__(self):
         pass
 
-    # 还差表跨页问题
-
     @staticmethod
     def _format_page_range(start: int, end: int) -> List[int]:
         """返回页码范围，单页返回 [8]，跨页返回 [2, 4]"""
         return [start, end] if start != end else [start]
 
-    def split_single_report(self,report_path_dir,chunk_size:int=300,chunk_overlap: int = 50):
+    def split_single_report(self,report_path_dir,chunk_size:int=500,chunk_overlap: int = 50):
         json_path = Path(report_path_dir) / "block_list.json"
+        file_origin=Path(report_path_dir).name # ../data/stock_data/debug_data/【财报】中芯国际：中芯国际2024年年度报告
+        # print(file_origin)
         if not json_path.exists():
             raise FileNotFoundError(f"找不到文件: {json_path}")
 
@@ -33,7 +33,7 @@ class TextSplitter:
             temp_chunk_text = ''
             current_start_page = 1 # 当前块所在的起始页数
 
-            # 表格缓冲区，用于合并跨页表格
+            # 表格缓冲区，用于合并跨页表格，还有table类的表格合并问题
             table_buffer: Optional[Dict] = None
             for page_idx,content in enumerate(report_data_pages): # 循环页数
                 for metaData in content: # 循环每一页的块数
@@ -50,6 +50,7 @@ class TextSplitter:
                         if len(temp_chunk_text) > 0:
                             chunks.append({
                                 'page_range': self._format_page_range(current_start_page, page_idx+1),
+                                'file_origin': f'{file_origin}.pdf',
                                 'text': temp_chunk_text
                             })
                             temp_chunk_text = ''  # 清空缓存
@@ -66,6 +67,7 @@ class TextSplitter:
                         # 将独立内容存入 chunks
                         chunks.append({
                             'page_range': self._format_page_range(current_start_page, current_end_page),
+                            'file_origin': f'{file_origin}.pdf',
                             'text': special_content
                         })
                         current_start_page = current_end_page
@@ -80,6 +82,7 @@ class TextSplitter:
                         if len(temp_chunk_text) > chunk_size:
                             chunks.append({
                                 'page_range': self._format_page_range(current_start_page, current_end_page),
+                                'file_origin': f'{file_origin}.pdf',
                                 'text': temp_chunk_text
                             })
                             current_start_page = current_end_page
@@ -96,6 +99,7 @@ class TextSplitter:
             if len(temp_chunk_text) > 0:
                 chunks.append({
                     'page_range': [current_end_page],
+                    'file_origin': f'{file_origin}.pdf',
                     'text': temp_chunk_text
                 })
 
@@ -109,9 +113,17 @@ class TextSplitter:
             # print(report_path) #【财报】中芯国际：中芯国际2024年年度报告
             report_path_dir=os.path.join(all_report_dir,report_path)
             if os.path.isdir(report_path_dir):
-                chunks = self.split_single_report(report_path_dir,1000)
+                chunks = self.split_single_report(report_path_dir,500,50)
+                output_data={
+                    "metainfo":{
+                        "file_name":report_path
+                    },
+                    "content":{
+                        "chunks":chunks
+                    }
+                }
                 with open(os.path.join(output_dir,f'{report_path}.json'),'w',encoding='utf-8') as f:
-                    json.dump(chunks, f, ensure_ascii=False, indent=4)
+                    json.dump(output_data, f, ensure_ascii=False, indent=4)
         print('切割完成')
 
 
