@@ -1,6 +1,9 @@
 """
 assistant_ticket_bot-1.py - 门票查询助手
 
+定义一个qwen的agent，assistant，然后定义prompt（里面叫他根据用户问题去生成sql）和 工具函数（定义接收的字段）
+然后大模型判断问题是否需要用到工具函数，然后再生成sql传给工具函数（返回查询结果），ai总结结果回复
+
 Author: lsy
 Date: 2026/1/13
 """
@@ -84,7 +87,7 @@ class ExcSqlTool(BaseTool):
         # database = args.get('database')
         # 创建数据库连接
         engine = create_engine(
-            f'mysql+pymysql://root:123@localhost:3306/ticket_assistant_db'
+            f'mysql+pymysql://root:123456789@localhost:3306/ticket_assistant_db'
         )
         try:
             df = pd.read_sql(sql_input, engine)
