@@ -11,6 +11,63 @@ import json
 import faiss
 import dashscope
 import numpy as np
+import glob
+from rank_bm25 import BM25Okapi
+import jieba
+from src.reranking_copy import LLMReranker
+
+class BM25Retriever:
+    def __init__(self, metadata_path: Path):
+        """
+        初始化 BM25 检索器
+        :param metadata_path: 存放分块 json 文件的目录路径
+        """
+        self.documents = []
+        self.corpus_tokens = []
+        self.bm25 = None
+
+        print(f"[BM25] 正在从 {metadata_path} 加载文档并构建索引...")
+        self._load_and_index(metadata_path)
+
+    def _load_and_index(self, metadata_path:Path):
+        with open(metadata_path,'r',encoding='utf-8') as f:
+            chunks = json.load(f)
+            for chunk in chunks:
+                self.documents.append(chunk)
+
+        # 2. 分词 - 使用jieba将中文文本切成词语列表（构建索引的关键）
+        self.corpus_tokens = [list(jieba.cut(doc['text'])) for doc in self.documents]
+
+        # 3. 初始化 BM25 模型
+        self.bm25 = BM25Okapi(self.corpus_tokens)
+
+    @staticmethod
+    def normalize_scores(scores):
+        """Min-Max 归一化到 [0, 1]"""
+        scores = np.array(scores)
+        min_score = scores.min()
+        max_score = scores.max()
+
+        # 避免除以 0
+        if max_score == min_score:
+            return np.zeros_like(scores)
+
+        return (scores - min_score) / (max_score - min_score)
+
+    def retrieve(self, question:str,top_n:int=20):
+        """检索相关文档"""
+        question_tokens = list(jieba.cut(question)) # 问题分词
+        raw_scores = self.bm25.get_scores(question_tokens) # 获取文档得分（返回的是文档在列表中的索引）
+        normalized_scores = self.normalize_scores(raw_scores) # 归一化
+        top_n_indices = normalized_scores.argsort()[-top_n:][::-1] # 倒序取前k个
+        # 组装结果
+        results = []
+        for index in top_n_indices:
+            doc = self.documents[index].copy()
+            # 将BM25分数添加到文档中（分数越大越好）
+            doc['bm25_score'] = float(normalized_scores[index])
+            results.append(doc)
+        return results
 
 class VectorRetriever:
     def __init__(self,vector_index_path:Path, metadata_path:Path,embedding_provider:str="dashscope"):
@@ -88,16 +145,122 @@ class VectorRetriever:
         # print('distances:',distances)
         # print('indices:',indices)
         for distance, index in zip(distances[0], indices[0]):
-            distance = round(float(distance),4)
+            distance = float(distance)
             chunk=self._metadata_list[index]
 
             result = {
-                "distance": distance,
+                "vector_score": distance,
                 "page_range": chunk["page_range"],
                 "file_origin": chunk["file_origin"],
                 "text": chunk["text"],
             }
             retrieval_results.append(result)
         return retrieval_results
+
+class HybridRetriever:
+    def __init__(self,vector_index_path:Path, metadata_path:Path):
+        self.vector_retriever = VectorRetriever(vector_index_path,metadata_path)
+        self.bm25_retriever = BM25Retriever(metadata_path)
+        self.reranker=LLMReranker()
+
+    def __format_retrieval_results(self,retrieval_results) -> str:
+        """将检索结果转化为RAG上下文字符串，优化大模型理解"""
+        context_parts = []
+
+        # 遍历检索出的每一个块
+        for idx, chunk in enumerate(retrieval_results):
+            # 1. 提取关键信息
+            vector_score = chunk.get('vector_score', 0)
+            bm25_score = chunk.get('bm25_score', 0)
+            final_score = chunk.get('final_score', 0)
+            file_name = chunk.get('file_origin', '未知文件')
+            page_range = chunk.get('page_range', [])
+            text_content = chunk.get('text', '')
+
+            # 2. 格式化页码信息 (例如：P34-35)
+            page_info = f"P{page_range[0]}" if page_range else "未知页码"
+            if len(page_range) > 1:
+                page_info += f"-{page_range[-1]}"
+
+            # 3. 构建每个块的展示文本
+            # 使用 >>> 符号作为视觉分隔符，帮助模型区分不同引用块
+            chunk_text = f"""
+    [参考文档 {idx + 1}] (向量分数: {vector_score})(bm25分数: {bm25_score})(加权分数: {final_score})
+    📂 来源文件: {file_name}
+    📄 页码: {page_info}
+    ---------------
+    {text_content}
+    """
+            context_parts.append(chunk_text)
+
+        # 4. 拼接所有块，作为整体上下文
+        rag_text = "\n".join(context_parts)
+        return rag_text
+
+    @staticmethod
+    def _merge_hybrid_results(vector_results, bm25_results, x=0.6):
+        """
+        融合向量检索和BM25检索的结果
+        :param vector_results: 向量检索的结果
+        :param bm25_results: BM25检索的结果
+        :param x: 向量占比的权重
+        :return: 融合后的结果
+        """
+
+        bm25_by_id = {}
+        for res in bm25_results:
+            chunk_id = res['text'][:50]
+            bm25_by_id[chunk_id] = res
+
+        # 建立映射（用text内容作为id进行去重和叠加）
+        merged_map = {}
+
+        for i, res in enumerate(vector_results):
+            chunk_id = res['text'][:50]
+            vector_score = float(res.get('vector_score', 0.0))
+
+            bm25_res = bm25_by_id.get(chunk_id)
+            bm25_score = float(bm25_res.get('bm25_score')) if bm25_res and bm25_res.get(
+                'bm25_score') is not None else 0.0
+
+            # 基于向量结果为主构造条目
+            merged_item = dict(res)
+            if bm25_res is not None and bm25_res.get('bm25_score') is not None:
+                merged_item['bm25_score'] = bm25_res['bm25_score']
+
+            final_score = x * vector_score + (1-x) * bm25_score
+            merged_item['final_score'] = final_score
+
+            merged_map[chunk_id] = merged_item
+        print(merged_map)
+
+        final_list = [item for item in merged_map.values()]
+        # 把总分写回到字典里
+        for i, item in enumerate(merged_map.values()):
+            final_list[i]['final_score'] = item['final_score']
+        final_list.sort(key=lambda x: x['final_score'], reverse=True)
+        return final_list
+
+    def hybrid_retriever_chunks(
+            self,
+            question:str,
+            llm_reranking_sample_size:int=10,
+            top_n:int=6,
+            llm_weight:float=0.7,
+    ) -> List[Dict]:
+        """
+        使用混合检索方法进行检索和重排
+        :param question: 检索的查询语句
+        :param llm_reranking_sample_size: 首轮向量检索返回的候选数量
+        :param top_n: 最终返回的重排结果数量
+        :param llm_weight: LLM分数权重
+        :return: 经过重排后的文档字典列表，包含分数
+        """
+        print('[HybridRetriever] 开始向量检索')
+        vector_results = self.vector_retriever.get_relevant_chunks(question,top_n=llm_reranking_sample_size)
+        bm25_results = self.bm25_retriever.retrieve(question,top_n=llm_reranking_sample_size)
+        x = 0.6 # (向量检索的占比)
+        merged_results = self._merge_hybrid_results(vector_results,bm25_results,x)
+        print(self.__format_retrieval_results(merged_results))
 
 
