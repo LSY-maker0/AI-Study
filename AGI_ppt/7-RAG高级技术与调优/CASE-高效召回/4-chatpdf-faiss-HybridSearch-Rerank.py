@@ -12,6 +12,10 @@ import torch
 import os
 import pickle
 
+# rerank有更加深层的推理，一个问题一个文本块比较
+# 与embedding区别就是更加有逻辑
+# 如 苹果 embedding比较相似度就会是一个水果，而rerank就可以根据意思推测出来是一部手机
+
 DASHSCOPE_API_KEY = os.getenv('DASHSCOPE_API_KEY')
 if not DASHSCOPE_API_KEY:
     raise ValueError("请设置环境变量 DASHSCOPE_API_KEY")
