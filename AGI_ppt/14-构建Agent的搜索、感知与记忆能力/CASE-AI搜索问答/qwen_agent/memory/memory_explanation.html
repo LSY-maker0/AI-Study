@@ -1,0 +1,163 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Memory 类详解 - Qwen Agent 记忆模块</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            line-height: 1.6;
+            margin: 0;
+            padding: 20px;
+            background-color: #f5f5f5;
+            color: #333;
+        }
+        .container {
+            max-width: 900px;
+            margin: auto;
+            background: white;
+            padding: 30px;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        h1 {
+            color: #2c3e50;
+            border-bottom: 2px solid #3498db;
+            padding-bottom: 10px;
+        }
+        h2 {
+            color: #34495e;
+            margin-top: 25px;
+        }
+        .section {
+            margin-bottom: 25px;
+        }
+        .highlight {
+            background-color: #e8f4fd;
+            padding: 15px;
+            border-left: 4px solid #3498db;
+            margin: 15px 0;
+        }
+        code {
+            background: #f8f9fa;
+            padding: 2px 4px;
+            border-radius: 3px;
+            font-family: 'Courier New', monospace;
+            color: #d63384;
+        }
+        pre {
+            background: #2b3e50;
+            color: #f8f9fa;
+            padding: 15px;
+            border-radius: 5px;
+            overflow-x: auto;
+        }
+        ul, ol {
+            padding-left: 20px;
+        }
+        li {
+            margin-bottom: 8px;
+        }
+        .note {
+            border-left: 4px solid #f39c12;
+            background-color: #fef9e7;
+            padding: 15px;
+            margin: 15px 0;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Qwen Agent Memory 类详解</h1>
+        
+        <div class="section">
+            <h2>概述</h2>
+            <p><code>Memory</code> 是一个特殊的代理类，专门用于文件管理和知识检索。它实现了RAG（检索增强生成）功能，允许系统在处理用户请求时参考上传的文档或预先配置的知识库文件。</p>
+            
+            <div class="highlight">
+                <strong>核心功能：</strong>将文件内容作为知识库存储，并在用户提问时检索相关内容以增强回答质量。
+            </div>
+        </div>
+        
+        <div class="section">
+            <h2>主要特性</h2>
+            <ul>
+                <li><strong>文件管理：</strong>自动处理消息中的上传文件，将其纳入知识库范围</li>
+                <li><strong>RAG支持：</strong>集成检索增强生成技术，提升回答准确性</li>
+                <li><strong>多种文件格式支持：</strong>包括PDF、Word、PowerPoint、Excel、TXT、CSV等多种常见格式</li>
+                <li><strong>智能关键词生成：</strong>根据用户查询自动生成检索关键词</li>
+                <li><strong>灵活配置：</strong>可自定义最大引用令牌数、解析页面大小等参数</li>
+            </ul>
+        </div>
+        
+        <div class="section">
+            <h2>关键组件</h2>
+            <h3>构造函数参数</h3>
+            <ul>
+                <li><code>function_list</code>: 自定义工具函数列表</li>
+                <li><code>llm</code>: 语言模型实例</li>
+                <li><code>system_message</code>: 系统提示消息</li>
+                <li><code>files</code>: 预加载的系统文件列表</li>
+                <li><code>rag_cfg</code>: RAG配置参数，包括：
+                    <ul>
+                        <li><code>max_ref_token</code>: 最大引用令牌数（默认4000）</li>
+                        <li><code>parser_page_size</code>: 解析器页面大小（默认500）</li>
+                        <li><code>rag_keygen_strategy</code>: 关键词生成策略</li>
+                        <li><code>rag_searchers</code>: 检索器类型列表</li>
+                    </ul>
+                </li>
+            </ul>
+            
+            <h3>主要方法</h3>
+            <ul>
+                <li><code>_run()</code>: 核心运行方法，处理用户消息并检索相关文档</li>
+                <li><code>get_rag_files()</code>: 获取待检索的文件列表</li>
+            </ul>
+        </div>
+        
+        <div class="section">
+            <h2>工作流程</h2>
+            <ol>
+                <li><strong>文件提取：</strong>从用户消息中识别并提取上传的文件路径</li>
+                <li><strong>文件过滤：</strong>验证文件类型是否支持（在PARSER_SUPPORTED_FILE_TYPES中）</li>
+                <li><strong>关键词生成：</strong>使用LLM根据用户查询生成检索关键词（如启用）</li>
+                <li><strong>内容检索：</strong>调用检索工具搜索相关文档片段</li>
+                <li><strong>结果返回：</strong>将检索到的内容作为消息返回给用户</li>
+            </ol>
+        </div>
+        
+        <div class="section">
+            <h2>支持的文件类型</h2>
+            <p>目前支持以下文件格式的解析和检索：</p>
+            <ul>
+                <li>.pdf (PDF文档)</li>
+                <li>.docx (Word文档)</li>
+                <li>.pptx (PowerPoint演示文稿)</li>
+                <li>.txt (纯文本文件)</li>
+                <li>.csv (逗号分隔值文件)</li>
+                <li>.tsv (制表符分隔值文件)</li>
+                <li>.xlsx (Excel电子表格)</li>
+                <li>.xls (旧版Excel电子表格)</li>
+                <li>HTML文件</li>
+            </ul>
+        </div>
+        
+        <div class="section">
+            <h2>典型应用场景</h2>
+            <ul>
+                <li><strong>企业知识库：</strong>员工上传政策文档、产品手册等，供智能助手检索</li>
+                <li><strong>学术研究：</strong>研究人员上传论文，系统可提取相关信息辅助分析</li>
+                <li><strong>客户服务：</strong>客服人员上传FAQ文档，辅助解答客户问题</li>
+                <li><strong>法律咨询：</strong>律师上传法规条文，在咨询时快速检索相关内容</li>
+            </ul>
+        </div>
+        
+        <div class="note">
+            <h3>注意事项</h3>
+            <p>如果未提供LLM模型，关键词生成功能将自动禁用（<code>rag_keygen_strategy</code>设为'none'）</p>
+            <p>该模块依赖于<code>qwen_agent</code>框架的核心组件，包括语言模型、工具系统等</p>
+        </div>
+    </div>
+</body>
+</html>

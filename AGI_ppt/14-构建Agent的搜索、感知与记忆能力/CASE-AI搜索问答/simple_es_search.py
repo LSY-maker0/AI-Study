@@ -11,7 +11,7 @@ import json
 # ==================== 配置部分 ====================
 ES_PORT = 9200
 ES_USER = 'elastic'
-ES_PASSWORD = ''
+ES_PASSWORD = 'dowzm*ceT3k8V6xWZGpt'
 
 INDEX_NAME = 'insurance_docs'
 DOCS_DIR = './docs'

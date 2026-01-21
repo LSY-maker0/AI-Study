@@ -5,7 +5,10 @@ Author: lsy
 Date: 2026/1/7
 """
 from pathlib import Path
+
+from src.api_requests import APIProcessor
 from src.retrieval import VectorRetriever
+from src.retrieval import HybridRetriever
 
 class QuestionsProcessor:
     def __init__(
@@ -21,6 +24,7 @@ class QuestionsProcessor:
         self.answering_model = answering_model
         self.vector_index_path = vector_index_path
         self.metadata_path = metadata_path
+        self.api_processor = APIProcessor(provider=self.api_provider)
 
     def __format_retrieval_results(self, retrieval_results) -> str:
         """将检索结果转化为RAG上下文字符串，优化大模型理解"""
@@ -29,7 +33,9 @@ class QuestionsProcessor:
         # 遍历检索出的每一个块
         for idx, chunk in enumerate(retrieval_results):
             # 1. 提取关键信息
-            score = chunk.get('distance', 0)
+            vector_score = chunk.get('vector_score', 0)
+            bm25_score = chunk.get('bm25_score', 0)
+            final_score = chunk.get('final_score', 0)
             file_name = chunk.get('file_origin', '未知文件')
             page_range = chunk.get('page_range', [])
             text_content = chunk.get('text', '')
@@ -42,25 +48,33 @@ class QuestionsProcessor:
             # 3. 构建每个块的展示文本
             # 使用 >>> 符号作为视觉分隔符，帮助模型区分不同引用块
             chunk_text = f"""
-[参考文档 {idx + 1}] (相关度: {score})
-📂 来源文件: {file_name}
-📄 页码: {page_info}
----------------
-{text_content}
-"""
+    [参考文档 {idx + 1}] (向量分数: {vector_score})(bm25分数: {bm25_score})(加权分数: {final_score})
+    📂 来源文件: {file_name}
+    📄 页码: {page_info}
+    ---------------
+    {text_content}
+    """
             context_parts.append(chunk_text)
 
         # 4. 拼接所有块，作为整体上下文
         rag_text = "\n".join(context_parts)
         return rag_text
 
-
     def process_single_question(self,question:str,kind:str) -> dict:
         """单条问题推理，返回结构化答案"""
         # retrieval=Hybridretrieval()
-        retrieval=VectorRetriever(vector_index_path=self.vector_index_path,metadata_path=self.metadata_path)
+        # retrieval=VectorRetriever(vector_index_path=self.vector_index_path,metadata_path=self.metadata_path)
+        retrieval=HybridRetriever(vector_index_path=self.vector_index_path,metadata_path=self.metadata_path)
+        relevant_chunks = retrieval.hybrid_retriever_chunks(question=question)
 
-        relevant_chunks=retrieval.get_relevant_chunks(question=question,top_n=20)
-        rag_context = self.__format_retrieval_results(relevant_chunks)
-        print(rag_context)
 
+        # relevant_chunks=retrieval.get_relevant_chunks(question=question,top_n=20)
+        # rag_context = self.__format_retrieval_results(relevant_chunks)
+        # # print(rag_context)
+        # answer_dict = self.api_processor.get_answer_from_rag_context(
+        #     question=question,
+        #     rag_context=rag_context,
+        #     kind=kind,
+        #     model=self.answering_model
+        # )
+        # return answer_dict
