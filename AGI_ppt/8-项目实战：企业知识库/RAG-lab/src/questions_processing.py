@@ -26,6 +26,40 @@ class QuestionsProcessor:
         self.metadata_path = metadata_path
         self.api_processor = APIProcessor(provider=self.api_provider)
 
+    # def __format_retrieval_results(self, retrieval_results) -> str:
+    #     """将检索结果转化为RAG上下文字符串，优化大模型理解"""
+    #     context_parts = []
+    #
+    #     # 遍历检索出的每一个块
+    #     for idx, chunk in enumerate(retrieval_results):
+    #         # 1. 提取关键信息
+    #         vector_score = chunk.get('vector_score', 0)
+    #         bm25_score = chunk.get('bm25_score', 0)
+    #         final_score = chunk.get('final_score', 0)
+    #         file_name = chunk.get('file_origin', '未知文件')
+    #         page_range = chunk.get('page_range', [])
+    #         text_content = chunk.get('text', '')
+    #
+    #         # 2. 格式化页码信息 (例如：P34-35)
+    #         page_info = f"P{page_range[0]}" if page_range else "未知页码"
+    #         if len(page_range) > 1:
+    #             page_info += f"-{page_range[-1]}"
+    #
+    #         # 3. 构建每个块的展示文本
+    #         # 使用 >>> 符号作为视觉分隔符，帮助模型区分不同引用块
+    #         chunk_text = f"""
+    # [参考文档 {idx + 1}] (向量分数: {vector_score})(bm25分数: {bm25_score})(加权分数: {final_score})
+    # 📂 来源文件: {file_name}
+    # 📄 页码: {page_info}
+    # ---------------
+    # {text_content}
+    # """
+    #         context_parts.append(chunk_text)
+    #
+    #     # 4. 拼接所有块，作为整体上下文
+    #     rag_text = "\n".join(context_parts)
+    #     return rag_text
+
     def __format_retrieval_results(self, retrieval_results) -> str:
         """将检索结果转化为RAG上下文字符串，优化大模型理解"""
         context_parts = []
@@ -33,9 +67,9 @@ class QuestionsProcessor:
         # 遍历检索出的每一个块
         for idx, chunk in enumerate(retrieval_results):
             # 1. 提取关键信息
-            vector_score = chunk.get('vector_score', 0)
-            bm25_score = chunk.get('bm25_score', 0)
-            final_score = chunk.get('final_score', 0)
+            # 只保留重排后的相关性分数
+            relevance_score = chunk.get('relevance_score', 0)
+
             file_name = chunk.get('file_origin', '未知文件')
             page_range = chunk.get('page_range', [])
             text_content = chunk.get('text', '')
@@ -46,9 +80,9 @@ class QuestionsProcessor:
                 page_info += f"-{page_range[-1]}"
 
             # 3. 构建每个块的展示文本
-            # 使用 >>> 符号作为视觉分隔符，帮助模型区分不同引用块
+            # 只显示重排后的分数
             chunk_text = f"""
-    [参考文档 {idx + 1}] (向量分数: {vector_score})(bm25分数: {bm25_score})(加权分数: {final_score})
+    [参考文档 {idx + 1}] (相关度: {relevance_score:.2f})
     📂 来源文件: {file_name}
     📄 页码: {page_info}
     ---------------
@@ -65,16 +99,13 @@ class QuestionsProcessor:
         # retrieval=Hybridretrieval()
         # retrieval=VectorRetriever(vector_index_path=self.vector_index_path,metadata_path=self.metadata_path)
         retrieval=HybridRetriever(vector_index_path=self.vector_index_path,metadata_path=self.metadata_path)
-        relevant_chunks = retrieval.hybrid_retriever_chunks(question=question)
+        relevant_chunks = retrieval.hybrid_retriever_chunks(question=question,llm_reranking_sample_size=12)
 
-
-        # relevant_chunks=retrieval.get_relevant_chunks(question=question,top_n=20)
-        # rag_context = self.__format_retrieval_results(relevant_chunks)
-        # # print(rag_context)
-        # answer_dict = self.api_processor.get_answer_from_rag_context(
-        #     question=question,
-        #     rag_context=rag_context,
-        #     kind=kind,
-        #     model=self.answering_model
-        # )
-        # return answer_dict
+        rag_context = self.__format_retrieval_results(relevant_chunks)
+        answer_dict = self.api_processor.get_answer_from_rag_context(
+            question=question,
+            rag_context=rag_context,
+            kind=kind,
+            model=self.answering_model
+        )
+        return answer_dict

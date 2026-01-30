@@ -14,7 +14,7 @@ import numpy as np
 import glob
 from rank_bm25 import BM25Okapi
 import jieba
-from src.reranking_copy import LLMReranker
+from src.reranking import LLMReranker
 
 class BM25Retriever:
     def __init__(self, metadata_path: Path):
@@ -163,40 +163,6 @@ class HybridRetriever:
         self.bm25_retriever = BM25Retriever(metadata_path)
         self.reranker=LLMReranker()
 
-    def __format_retrieval_results(self,retrieval_results) -> str:
-        """将检索结果转化为RAG上下文字符串，优化大模型理解"""
-        context_parts = []
-
-        # 遍历检索出的每一个块
-        for idx, chunk in enumerate(retrieval_results):
-            # 1. 提取关键信息
-            vector_score = chunk.get('vector_score', 0)
-            bm25_score = chunk.get('bm25_score', 0)
-            final_score = chunk.get('final_score', 0)
-            file_name = chunk.get('file_origin', '未知文件')
-            page_range = chunk.get('page_range', [])
-            text_content = chunk.get('text', '')
-
-            # 2. 格式化页码信息 (例如：P34-35)
-            page_info = f"P{page_range[0]}" if page_range else "未知页码"
-            if len(page_range) > 1:
-                page_info += f"-{page_range[-1]}"
-
-            # 3. 构建每个块的展示文本
-            # 使用 >>> 符号作为视觉分隔符，帮助模型区分不同引用块
-            chunk_text = f"""
-    [参考文档 {idx + 1}] (向量分数: {vector_score})(bm25分数: {bm25_score})(加权分数: {final_score})
-    📂 来源文件: {file_name}
-    📄 页码: {page_info}
-    ---------------
-    {text_content}
-    """
-            context_parts.append(chunk_text)
-
-        # 4. 拼接所有块，作为整体上下文
-        rag_text = "\n".join(context_parts)
-        return rag_text
-
     @staticmethod
     def _merge_hybrid_results(vector_results, bm25_results, x=0.6):
         """
@@ -244,23 +210,33 @@ class HybridRetriever:
     def hybrid_retriever_chunks(
             self,
             question:str,
-            llm_reranking_sample_size:int=10,
+            llm_reranking_sample_size:int=12,
+            rerank_batch_size:int=3,
             top_n:int=6,
-            llm_weight:float=0.7,
+            llm_weight:float=0.6,
     ) -> List[Dict]:
         """
         使用混合检索方法进行检索和重排
         :param question: 检索的查询语句
         :param llm_reranking_sample_size: 首轮向量检索返回的候选数量
+
         :param top_n: 最终返回的重排结果数量
         :param llm_weight: LLM分数权重
         :return: 经过重排后的文档字典列表，包含分数
         """
-        print('[HybridRetriever] 开始向量检索')
+        print('[HybridRetriever] 开始混合检索...')
         vector_results = self.vector_retriever.get_relevant_chunks(question,top_n=llm_reranking_sample_size)
         bm25_results = self.bm25_retriever.retrieve(question,top_n=llm_reranking_sample_size)
-        x = 0.6 # (向量检索的占比)
-        merged_results = self._merge_hybrid_results(vector_results,bm25_results,x)
-        print(self.__format_retrieval_results(merged_results))
+        x = llm_weight # (向量检索的占比)
+        hybrid_results = self._merge_hybrid_results(vector_results,bm25_results,x)
+
+        print('[HybridRetriever] 开始LLM重排...')
+        reranked_results=self.reranker.rerank_chunks(
+            question=question,
+            retrieved_chunks=hybrid_results,
+            top_n=top_n,
+            rerank_batch_size=rerank_batch_size,
+        )
+        return reranked_results
 
 

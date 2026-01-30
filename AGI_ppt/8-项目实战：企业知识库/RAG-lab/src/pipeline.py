@@ -38,9 +38,6 @@ class Pipeline:
         vdb_ingestor.process_reports(input_dir=input_dir, output_dir=output_dir)
         print(f'向量数据库已经创建到{output_dir}中')
 
-    # def process_questions(self):
-    #
-
     def answer_single_question(self,question:str,kind:str="summary"):
         """
         单条问题即时推理
@@ -50,15 +47,14 @@ class Pipeline:
         t0=time.time()
         processor = QuestionsProcessor(
             llm_ranking=False,
-            api_provider="dashscope", # openai
-            answering_model="qwen-turbo-lastest",
+            api_provider="dashscope",
+            answering_model="qwen-turbo",
             vector_index_path=Path("../data/stock_data/databases/vector_dbs/all_reports.faiss"),
             metadata_path=Path("../data/stock_data/databases/vector_dbs/all_metadata.json")
         )
         answer = processor.process_single_question(question,kind=kind)
         t1=time.time()
-        print()
-
+        print('大模型的回答：',answer)
 
 if __name__ == '__main__':
     root_path=here()/"data"/"stock_data"
